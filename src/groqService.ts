@@ -1,5 +1,8 @@
-import * as vscode from "vscode";
-import Groq from "groq-sdk";
+import * as vscode from "vscode"
+import Groq from "groq-sdk"
+import { Logger } from "./utils/logger"
+import { ConfigManager } from "./utils/configManager"
+import { ErrorHandler } from "./utils/errorHandler"
 
 export interface CompletionRequest {
   prompt: string
@@ -18,46 +21,48 @@ export interface CompletionResponse {
 }
 
 export class GroqService {
-  private groq: Groq | null = null;
-  private isInitialized = false;
+  private groq: Groq | null = null
+  private isInitialized = false
 
   constructor() {
-    this.initialize();
+    this.initialize()
 
+    // Listen for configuration changes
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration("groqAssistant.apiKey")) {
-        this.initialize();
+      if (event.affectsConfiguration("snipplyCopilot.apiKey")) {
+        this.initialize()
       }
-    });
+    })
   }
 
   private initialize() {
-    const config = vscode.workspace.getConfiguration("groqAssistant");
-    const apiKey = config.get<string>("apiKey");
+    const config = ConfigManager.getConfig()
 
-    if (apiKey && apiKey.trim()) {
+    if (config.apiKey && config.apiKey.trim()) {
       this.groq = new Groq({
-        apiKey: apiKey.trim(),
-      });
-      this.isInitialized = true;
+        apiKey: config.apiKey.trim(),
+      })
+      this.isInitialized = true
+      Logger.info("Groq service initialized successfully")
     } else {
-      this.groq = null;
-      this.isInitialized = false;
+      this.groq = null
+      this.isInitialized = false
+      Logger.warn("Groq service not initialized - missing API key")
     }
   }
 
   public isReady(): boolean {
-    return this.isInitialized && this.groq !== null;
+    return this.isInitialized && this.groq !== null
   }
 
   public async generateCompletion(request: CompletionRequest): Promise<CompletionResponse> {
     if (!this.isReady()) {
-      throw new Error("Groq service not initialized. Please configure your API key.");
+      throw new Error("Groq service not initialized. Please configure your API key.")
     }
 
-    const config = vscode.workspace.getConfiguration("groqAssistant");
-    const model = config.get<string>("model", "llama-3.1-70b-versatile");
-    const maxTokens = request.maxTokens || config.get<number>("maxTokens", 1000);
+    const config = ConfigManager.getConfig()
+    const model = config.model || "llama-3.1-70b-versatile"
+    const maxTokens = request.maxTokens || config.maxTokens || 1000
 
     try {
       const completion = await this.groq!.chat.completions.create({
@@ -75,9 +80,9 @@ export class GroqService {
         max_tokens: maxTokens,
         temperature: request.temperature || 0.1,
         stream: false,
-      });
+      })
 
-      const text = completion.choices[0]?.message?.content || "";
+      const text = completion.choices[0]?.message?.content || ""
 
       return {
         text,
@@ -86,10 +91,11 @@ export class GroqService {
           completionTokens: completion.usage?.completion_tokens || 0,
           totalTokens: completion.usage?.total_tokens || 0,
         },
-      };
+      }
     } catch (error) {
-      console.error("Groq API error:", error);
-      throw new Error(`Failed to generate completion: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error("Groq API error:", error)
+      ErrorHandler.handleError(error)
+      throw new Error(`Failed to generate completion: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
 
@@ -99,36 +105,39 @@ export class GroqService {
     context: vscode.InlineCompletionContext,
   ): Promise<string> {
     if (!this.isReady()) {
-      return "";
+      return ""
     }
 
-    const config = vscode.workspace.getConfiguration("groqAssistant");
-    const model = config.get<string>("model", "llama-3.1-8b-instant");
+    const config = ConfigManager.getConfig()
+    const model = config.model || "llama-3.1-8b-instant" // Use faster model for inline
 
-    const linePrefix = document.lineAt(position).text.substring(0, position.character);
-    const lineSuffix = document.lineAt(position).text.substring(position.character);
+    // Get context around cursor
+    const linePrefix = document.lineAt(position).text.substring(0, position.character)
+    const lineSuffix = document.lineAt(position).text.substring(position.character)
 
-    const startLine = Math.max(0, position.line - 5);
-    const endLine = Math.min(document.lineCount - 1, position.line + 5);
-    const contextLines = [];
+    // Get surrounding context (5 lines before and after)
+    const startLine = Math.max(0, position.line - 5)
+    const endLine = Math.min(document.lineCount - 1, position.line + 5)
+    const contextLines = []
 
     for (let i = startLine; i <= endLine; i++) {
       if (i === position.line) {
-        contextLines.push(linePrefix + "<CURSOR>" + lineSuffix);
+        contextLines.push(linePrefix + "<CURSOR>" + lineSuffix)
       } else {
-        contextLines.push(document.lineAt(i).text);
+        contextLines.push(document.lineAt(i).text)
       }
     }
 
-    const contextCode = contextLines.join("\n");
-    const language = document.languageId;
+    const contextCode = contextLines.join("\n")
+    const language = document.languageId
 
     const prompt = `Complete the code at the <CURSOR> position. Only return the completion text, no explanations or markdown formatting.
 
 Language: ${language}
-Context: ${contextCode}
+Context:
+${contextCode}
 
-Complete the code at <CURSOR>:`;
+Complete the code at <CURSOR>:`
 
     try {
       const completion = await this.groq!.chat.completions.create({
@@ -147,12 +156,13 @@ Complete the code at <CURSOR>:`;
         temperature: 0.1,
         stream: false,
         stop: ["\n\n", "```"],
-      });
+      })
 
-      return completion.choices[0]?.message?.content?.trim() || "";
+      return completion.choices[0]?.message?.content?.trim() || ""
     } catch (error) {
-      console.error("Inline completion error:", error);
-      return "";
+      console.error("Inline completion error:", error)
+      ErrorHandler.handleError(error)
+      return ""
     }
   }
 }

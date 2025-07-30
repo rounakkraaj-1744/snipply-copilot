@@ -1,50 +1,56 @@
-import * as vscode from "vscode";
-import { GroqService } from "./groqService";
-import { InlineCompletionProvider } from "./inlineCompletionProvider";
-import { CodeAssistantProvider } from "./codeAssistantProvider";
+import * as vscode from "vscode"
+import { GroqService } from "./groqService"
+import { InlineCompletionProvider } from "./inlineCompletionProvider"
+import { CodeAssistantProvider } from "./codeAssistantProvider"
+import { Logger } from "./utils/logger"
 
-let groqService: GroqService;
-let inlineCompletionProvider: InlineCompletionProvider;
-let codeAssistantProvider: CodeAssistantProvider;
+let groqService: GroqService
+let inlineCompletionProvider: InlineCompletionProvider
+let codeAssistantProvider: CodeAssistantProvider
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("Groq Code Assistant is now active!");
+  Logger.initialize()
+  Logger.info("Snipply Copilot is now active!")
 
-  groqService = new GroqService();
-  inlineCompletionProvider = new InlineCompletionProvider(groqService);
-  codeAssistantProvider = new CodeAssistantProvider(groqService);
+  // Initialize services
+  groqService = new GroqService()
+  inlineCompletionProvider = new InlineCompletionProvider(groqService)
+  codeAssistantProvider = new CodeAssistantProvider(groqService)
 
+  // Register inline completion provider
   const inlineCompletionDisposable = vscode.languages.registerInlineCompletionItemProvider(
     { pattern: "**" },
     inlineCompletionProvider,
-  );
+  )
 
-  const generateCodeCommand = vscode.commands.registerCommand("groqAssistant.generateCode", async () => {
-    await codeAssistantProvider.generateCode();
-  });
+  // Register commands
+  const generateCodeCommand = vscode.commands.registerCommand("snipplyCopilot.generateCode", async () => {
+    await codeAssistantProvider.generateCode()
+  })
 
-  const explainCodeCommand = vscode.commands.registerCommand("groqAssistant.explainCode", async () => {
-    await codeAssistantProvider.explainCode();
-  });
+  const explainCodeCommand = vscode.commands.registerCommand("snipplyCopilot.explainCode", async () => {
+    await codeAssistantProvider.explainCode()
+  })
 
-  const refactorCodeCommand = vscode.commands.registerCommand("groqAssistant.refactorCode", async () => {
-    await codeAssistantProvider.refactorCode();
-  });
+  const refactorCodeCommand = vscode.commands.registerCommand("snipplyCopilot.refactorCode", async () => {
+    await codeAssistantProvider.refactorCode()
+  })
 
-  const fixCodeCommand = vscode.commands.registerCommand("groqAssistant.fixCode", async () => {
-    await codeAssistantProvider.fixCode();
-  });
+  const fixCodeCommand = vscode.commands.registerCommand("snipplyCopilot.fixCode", async () => {
+    await codeAssistantProvider.fixCode()
+  })
 
   const toggleInlineCompletionCommand = vscode.commands.registerCommand(
-    "groqAssistant.toggleInlineCompletion",
+    "snipplyCopilot.toggleInlineCompletion",
     async () => {
-      const config = vscode.workspace.getConfiguration("groqAssistant");
-      const currentValue = config.get("enableInlineCompletion", true);
-      await config.update("enableInlineCompletion", !currentValue, vscode.ConfigurationTarget.Global);
-      vscode.window.showInformationMessage(`Inline completion ${!currentValue ? "enabled" : "disabled"}`);
+      const config = vscode.workspace.getConfiguration("snipplyCopilot")
+      const currentValue = config.get("enableInlineCompletion", true)
+      await config.update("enableInlineCompletion", !currentValue, vscode.ConfigurationTarget.Global)
+      vscode.window.showInformationMessage(`Inline completion ${!currentValue ? "enabled" : "disabled"}`)
     },
-  );
+  )
 
+  // Add all disposables to context
   context.subscriptions.push(
     inlineCompletionDisposable,
     generateCodeCommand,
@@ -52,17 +58,19 @@ export function activate(context: vscode.ExtensionContext) {
     refactorCodeCommand,
     fixCodeCommand,
     toggleInlineCompletionCommand,
-  );
+  )
 
+  // Show welcome message
   vscode.window
-    .showInformationMessage("Groq Code Assistant activated! Configure your API key in settings.", "Open Settings")
+    .showInformationMessage("Snipply Copilot activated! Configure your API key in settings.", "Open Settings")
     .then((selection) => {
       if (selection === "Open Settings") {
-        vscode.commands.executeCommand("workbench.action.openSettings", "groqAssistant");
+        vscode.commands.executeCommand("workbench.action.openSettings", "snipplyCopilot")
       }
-    });
+    })
 }
 
 export function deactivate() {
-  console.log("Groq Code Assistant deactivated");
+  Logger.info("Snipply Copilot deactivated")
+  Logger.dispose()
 }
