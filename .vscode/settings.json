@@ -1,11 +1,31 @@
-// Place your settings in this file to overwrite default and user settings.
 {
-	"files.exclude": {
-		"out": false // set this to true to hide the "out" folder with the compiled JS files
-	},
-	"search.exclude": {
-		"out": true // set this to false to include "out" folder in search results
-	},
-	// Turn off tsc task auto detection since we have the necessary tasks as npm scripts
-	"typescript.tsc.autoDetect": "off"
+    "typescript.preferences.includePackageJsonAutoImports": "off",
+    "typescript.suggest.autoImports": false,
+    
+    // Recommended snipply Settings for Groq
+    "snipply.enabled": true,
+    "snipply.apiProvider": "groq",
+    "snipply.groqModel": "llama3-70b-8192",
+    "snipply.maxTokens": 100,
+    "snipply.debounceMs": 300,
+    "snipply.temperature": 0.1,
+    
+    // VS Code settings that work well with snipply
+    "editor.quickSuggestions": {
+        "other": true,
+        "comments": false,
+        "strings": false
+    },
+    "editor.suggestOnTriggerCharacters": true,
+    "editor.wordBasedSuggestions": false,
+    "editor.suggest.localityBonus": true,
+    "editor.suggest.shareSuggestSelections": false,
+    "editor.acceptSuggestionOnCommitCharacter": false,
+    "editor.acceptSuggestionOnEnter": "off",
+    
+    // Performance settings
+    "files.watcherExclude": {
+        "**/node_modules/**": true,
+        "**/out/**": true
+    }
 }

@@ -1,102 +1,116 @@
 {
   "name": "snipply-copilot",
-  "displayName": "Snipply Copilot",
-  "description": "AI-powered code completion and assistance using Groq LLM - Your intelligent coding companion",
-  "version": "0.0.1",
+  "displayName": "snipply Copilot",
+  "description": "AI-powered inline code completion and suggestions using Groq API - fast, affordable alternative to GitHub Copilot",
+  "version": "1.0.0",
+  "publisher": "snipply",
   "engines": {
     "vscode": "^1.74.0"
   },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "categories": [
+    "Machine Learning",
+    "Programming Languages",
+    "Snippets",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "copilot",
+    "autocomplete",
+    "code completion",
+    "groq",
+    "llama3"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "snipplyCopilot.generateCode",
-        "title": "Generate Code",
-        "category": "Snipply Copilot"
+        "command": "snipply.toggle",
+        "title": "Toggle snipply Copilot",
+        "category": "snipply"
       },
       {
-        "command": "snipplyCopilot.explainCode",
-        "title": "Explain Code",
-        "category": "Snipply Copilot"
+        "command": "snipply.setApiKey",
+        "title": "Set API Key",
+        "category": "snipply"
       },
       {
-        "command": "snipplyCopilot.refactorCode",
-        "title": "Refactor Code",
-        "category": "Snipply Copilot"
+        "command": "snipply.clearCache",
+        "title": "Clear Completion Cache",
+        "category": "snipply"
       },
       {
-        "command": "snipplyCopilot.fixCode",
-        "title": "Fix Code",
-        "category": "Snipply Copilot"
+        "command": "snipply.acceptSuggestion",
+        "title": "Accept Suggestion",
+        "category": "snipply"
       },
       {
-        "command": "snipplyCopilot.toggleInlineCompletion",
-        "title": "Toggle Inline Completion",
-        "category": "Snipply Copilot"
+        "command": "snipply.dismissSuggestion",
+        "title": "Dismiss Suggestion",
+        "category": "snipply"
       }
     ],
     "keybindings": [
       {
-        "command": "snipplyCopilot.generateCode",
-        "key": "ctrl+shift+g",
-        "mac": "cmd+shift+g"
+        "command": "snipply.acceptSuggestion",
+        "key": "tab",
+        "when": "editorTextFocus && snipply.suggestionVisible"
       },
       {
-        "command": "snipplyCopilot.explainCode",
-        "key": "ctrl+shift+e",
-        "mac": "cmd+shift+e"
+        "command": "snipply.dismissSuggestion",
+        "key": "escape",
+        "when": "editorTextFocus && snipply.suggestionVisible"
       }
     ],
-    "menus": {
-      "editor/context": [
-        {
-          "command": "snipplyCopilot.explainCode",
-          "when": "editorHasSelection",
-          "group": "snipply@1"
-        },
-        {
-          "command": "snipplyCopilot.refactorCode",
-          "when": "editorHasSelection",
-          "group": "snipply@2"
-        },
-        {
-          "command": "snipplyCopilot.fixCode",
-          "when": "editorHasSelection",
-          "group": "snipply@3"
-        }
-      ]
-    },
     "configuration": {
-      "title": "Snipply Copilot",
+      "title": "snipply Copilot",
       "properties": {
-        "snipplyCopilot.apiKey": {
-          "type": "string",
-          "default": "",
-          "description": "Groq API Key",
-          "markdownDescription": "Your Groq API key. Get one from [Groq Console](https://console.groq.com/)"
-        },
-        "snipplyCopilot.model": {
-          "type": "string",
-          "default": "llama-3.1-70b-versatile",
-          "enum": ["llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"],
-          "description": "Groq model to use for code generation"
-        },
-        "snipplyCopilot.enableInlineCompletion": {
+        "snipply.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable inline code completion"
+          "description": "Enable/disable snipply Copilot"
         },
-        "snipplyCopilot.completionDelay": {
-          "type": "number",
-          "default": 500,
-          "description": "Delay in milliseconds before triggering completion"
+        "snipply.apiProvider": {
+          "type": "string",
+          "enum": [
+            "groq",
+            "claude"
+          ],
+          "default": "groq",
+          "description": "API provider to use for completions (Groq is recommended and more affordable)"
         },
-        "snipplyCopilot.maxTokens": {
+        "snipply.groqModel": {
+          "type": "string",
+          "enum": [
+            "llama3-70b-8192",
+            "llama3-8b-8192",
+            "mixtral-8x7b-32768",
+            "gemma-7b-it",
+            "llama3-groq-70b-8192-tool-use-preview",
+            "llama3-groq-8b-8192-tool-use-preview"
+          ],
+          "default": "llama3-70b-8192",
+          "description": "Groq model to use for completions"
+        },
+        "snipply.maxTokens": {
           "type": "number",
-          "default": 1000,
+          "default": 100,
           "description": "Maximum tokens for completion"
+        },
+        "snipply.debounceMs": {
+          "type": "number",
+          "default": 300,
+          "description": "Debounce delay in milliseconds"
+        },
+        "snipply.temperature": {
+          "type": "number",
+          "default": 0.1,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Temperature for completion generation"
         }
       }
     }
@@ -107,19 +121,24 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "deploy": "vsce publish",
+    "clean": "rimraf out",
+    "dev": "npm run clean && npm run compile"
   },
   "devDependencies": {
+    "@types/node": "16.x",
     "@types/vscode": "^1.74.0",
-    "@types/node": "24.1.0",
-    "@types/mocha": "^10.0.1",
-    "@types/glob": "^8.1.0",
-    "@vscode/test-electron": "^2.3.0",
-    "typescript": "^4.9.4",
-    "mocha": "^10.2.0",
-    "glob": "^8.1.0"
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "@vscode/test-electron": "^2.2.0",
+    "eslint": "^8.28.0",
+    "rimraf": "^3.0.2",
+    "typescript": "^4.9.4"
   },
   "dependencies": {
-    "groq-sdk": "^0.7.0"
+    "@anthropic-ai/sdk": "^0.20.9",
+    "groq-sdk": "^0.3.0"
   }
 }

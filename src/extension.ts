@@ -1,76 +1,111 @@
-import * as vscode from "vscode"
-import { GroqService } from "./groqService"
-import { InlineCompletionProvider } from "./inlineCompletionProvider"
-import { CodeAssistantProvider } from "./codeAssistantProvider"
-import { Logger } from "./utils/logger"
+import * as vscode from 'vscode';
+import { snipplyProvider } from './provider';
+import { ApiKeyManager } from './apiKeyManager';
+import { InlineCompletionProvider } from './inlineCompletionProvider';
 
-let groqService: GroqService
-let inlineCompletionProvider: InlineCompletionProvider
-let codeAssistantProvider: CodeAssistantProvider
+let provider: snipplyProvider;
+let inlineProvider: InlineCompletionProvider;
+let statusBarItem: vscode.StatusBarItem;
 
 export function activate(context: vscode.ExtensionContext) {
-  Logger.initialize()
-  Logger.info("Snipply Copilot is now active!")
+    console.log('snipply Copilot is now active!');
 
-  // Initialize services
-  groqService = new GroqService()
-  inlineCompletionProvider = new InlineCompletionProvider(groqService)
-  codeAssistantProvider = new CodeAssistantProvider(groqService)
+    const apiKeyManager = new ApiKeyManager(context);
+    provider = new snipplyProvider(apiKeyManager);
+    inlineProvider = new InlineCompletionProvider(provider);
 
-  // Register inline completion provider
-  const inlineCompletionDisposable = vscode.languages.registerInlineCompletionItemProvider(
-    { pattern: "**" },
-    inlineCompletionProvider,
-  )
+    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    statusBarItem.command = 'snipply.toggle';
+    updateStatusBar();
+    statusBarItem.show();
 
-  // Register commands
-  const generateCodeCommand = vscode.commands.registerCommand("snipplyCopilot.generateCode", async () => {
-    await codeAssistantProvider.generateCode()
-  })
+    const inlineCompletionDisposable = vscode.languages.registerInlineCompletionItemProvider(
+        { pattern: '**' },
+        inlineProvider
+    );
 
-  const explainCodeCommand = vscode.commands.registerCommand("snipplyCopilot.explainCode", async () => {
-    await codeAssistantProvider.explainCode()
-  })
+    const toggleCommand = vscode.commands.registerCommand('snipply.toggle', () => {
+        const config = vscode.workspace.getConfiguration('snipply');
+        const enabled = config.get<boolean>('enabled', true);
+        config.update('enabled', !enabled, vscode.ConfigurationTarget.Global);
+        updateStatusBar();
+        vscode.window.showInformationMessage(`snipply Copilot ${!enabled ? 'enabled' : 'disabled'}`);
+    });
 
-  const refactorCodeCommand = vscode.commands.registerCommand("snipplyCopilot.refactorCode", async () => {
-    await codeAssistantProvider.refactorCode()
-  })
+    const setApiKeyCommand = vscode.commands.registerCommand('snipply.setApiKey', async () => {
+        const config = vscode.workspace.getConfiguration('snipply');
+        const provider = config.get<string>('apiProvider', 'groq');
+        
+        let prompt = '';
+        let placeholder = '';
+        
+        if (provider === 'groq') {
+            prompt = 'Enter your Groq API key (Get one free at console.groq.com)';
+            placeholder = 'gsk_...';
+        }
+        else {
+            prompt = 'Enter your Claude API key (Paid service from console.anthropic.com)';
+            placeholder = 'sk-ant-...';
+        }
+        
+        const apiKey = await vscode.window.showInputBox({
+            prompt,
+            password: true,
+            placeHolder: placeholder
+        });
 
-  const fixCodeCommand = vscode.commands.registerCommand("snipplyCopilot.fixCode", async () => {
-    await codeAssistantProvider.fixCode()
-  })
+        if (apiKey) {
+          //@ts-ignore
+            await apiKeyManager.setApiKey(provider, apiKey);
+            vscode.window.showInformationMessage(`${provider.toUpperCase()} API key saved successfully! 🚀`);
+        }
+    });
 
-  const toggleInlineCompletionCommand = vscode.commands.registerCommand(
-    "snipplyCopilot.toggleInlineCompletion",
-    async () => {
-      const config = vscode.workspace.getConfiguration("snipplyCopilot")
-      const currentValue = config.get("enableInlineCompletion", true)
-      await config.update("enableInlineCompletion", !currentValue, vscode.ConfigurationTarget.Global)
-      vscode.window.showInformationMessage(`Inline completion ${!currentValue ? "enabled" : "disabled"}`)
-    },
-  )
+    const clearCacheCommand = vscode.commands.registerCommand('snipply.clearCache', () => {
+        provider.clearCache();
+        vscode.window.showInformationMessage('Completion cache cleared!');
+    });
 
-  // Add all disposables to context
-  context.subscriptions.push(
-    inlineCompletionDisposable,
-    generateCodeCommand,
-    explainCodeCommand,
-    refactorCodeCommand,
-    fixCodeCommand,
-    toggleInlineCompletionCommand,
-  )
+    const acceptSuggestionCommand = vscode.commands.registerCommand('snipply.acceptSuggestion', () => {
+        inlineProvider.acceptCurrentSuggestion();
+    });
 
-  // Show welcome message
-  vscode.window
-    .showInformationMessage("Snipply Copilot activated! Configure your API key in settings.", "Open Settings")
-    .then((selection) => {
-      if (selection === "Open Settings") {
-        vscode.commands.executeCommand("workbench.action.openSettings", "snipplyCopilot")
-      }
-    })
+    const dismissSuggestionCommand = vscode.commands.registerCommand('snipply.dismissSuggestion', () => {
+        inlineProvider.dismissCurrentSuggestion();
+    });
+
+    const configChangeDisposable = vscode.workspace.onDidChangeConfiguration(event => {
+        if (event.affectsConfiguration('snipply')) {
+            updateStatusBar();
+        }
+    });
+
+    context.subscriptions.push(
+        inlineCompletionDisposable,
+        toggleCommand,
+        setApiKeyCommand,
+        clearCacheCommand,
+        acceptSuggestionCommand,
+        dismissSuggestionCommand,
+        configChangeDisposable,
+        statusBarItem
+    );
+}
+
+function updateStatusBar() {
+    const config = vscode.workspace.getConfiguration('snipply');
+    const enabled = config.get<boolean>('enabled', true);
+    const provider = config.get<string>('apiProvider', 'groq');
+    
+    statusBarItem.text = `$(rocket) snipply ${enabled ? '$(check)' : '$(x)'} ${provider.toUpperCase()}`;
+    statusBarItem.tooltip = `snipply Copilot is ${enabled ? 'enabled' : 'disabled'} (using ${provider.toUpperCase()})`;
 }
 
 export function deactivate() {
-  Logger.info("Snipply Copilot deactivated")
-  Logger.dispose()
+    if (provider) {
+        provider.dispose();
+    }
+    if (statusBarItem) {
+        statusBarItem.dispose();
+    }
 }
