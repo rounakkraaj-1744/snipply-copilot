@@ -1,9 +1,15 @@
 {
   "name": "snipply-copilot",
-  "displayName": "snipply Copilot",
+  "displayName": "Snipply Copilot",
   "description": "AI-powered inline code completion and suggestions using Groq API - fast, affordable alternative to GitHub Copilot",
-  "version": "1.0.0",
-  "publisher": "snipply",
+  "version": "1.0.1",
+  "icon": "images/snipply-logo.png",
+  "publisher": "rounakkraajsabat",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rounakkraaj-1744/snipply-copilot.git"
+  },
   "engines": {
     "vscode": "^1.74.0"
   },
